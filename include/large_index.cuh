@@ -1,5 +1,5 @@
 #include <common.cuh>
-#include <Tagore.cuh>
+#include <Tagore_src.cuh>
 
 #include <cassert>
 #include <thread>

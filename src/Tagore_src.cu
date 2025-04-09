@@ -1,4 +1,4 @@
-#include <Tagore.cuh>
+#include <Tagore_src.cuh>
 
 using namespace nvcuda;
 
@@ -293,7 +293,7 @@ __global__ void sample_kernel6(unsigned* graph, unsigned* reverse_graph, unsigne
     }
     __syncthreads();
     
-    if(bid == 0 && tid == 0) printf("Dup: %d %d\n", dup_num, it);
+    // if(bid == 0 && tid == 0) printf("Dup: %d %d\n", dup_num, it);
 
     for(unsigned i = tid; i < dup_num; i += blockDim.x * blockDim.y){
         float val = new_dist_shared[i];
@@ -371,15 +371,15 @@ __global__ void sample_kernel6(unsigned* graph, unsigned* reverse_graph, unsigne
         }
     }
     }
-    __syncthreads();
-    if(it == all_it - 1 && bid == 0 && tid == 0){
-        for(unsigned i = 0; i < K; i++)
-            printf("%f, ", nei_distance[bid * K + i]);
-        printf("\n");
-        for(unsigned i = 0; i < K; i++)
-            printf("%d, ", graph[bid * K + i]);
-        printf("\n");
-    }
+    // __syncthreads();
+    // if(it == all_it - 1 && bid == 0 && tid == 0){
+    //     for(unsigned i = 0; i < K; i++)
+    //         printf("%f, ", nei_distance[bid * K + i]);
+    //     printf("\n");
+    //     for(unsigned i = 0; i < K; i++)
+    //         printf("%d, ", graph[bid * K + i]);
+    //     printf("\n");
+    // }
 }
 
 __global__ void reset_reverse_num(unsigned* reverse_num, unsigned POINTS){
@@ -552,7 +552,7 @@ __global__ void nn_descent_opt_sample(unsigned* graph, unsigned* reverse_graph, 
         // new_list[bid][0] = new_nn_count;
         new_num_global[bid] = new_nn_count;
         old_num_global[bid] = old_nn_count;
-        if(bid == 0) printf("%d %d | ", old_nn_count, new_nn_count);
+        // if(bid == 0) printf("%d %d | ", old_nn_count, new_nn_count);
     }
 }
 
@@ -1019,7 +1019,7 @@ __global__ void nn_descent_opt_merge(unsigned* graph, unsigned* reverse_graph, u
     }
     __syncthreads();
    
-    if(bid == 0 && tid == 0) printf("Dup: %d %d\n", dup_num, it);
+    // if(bid == 0 && tid == 0) printf("Dup: %d %d\n", dup_num, it);
 
     for(unsigned i = tid; i < dup_num; i += blockDim.x * blockDim.y){
         if(new_list2[i] == K){
@@ -1089,12 +1089,12 @@ __global__ void nn_descent_opt_merge(unsigned* graph, unsigned* reverse_graph, u
             }
         }
     }
-    __syncthreads();
-    if(it == all_it - 1 && bid == 0 && tid == 0){
-        for(unsigned i = 0; i < K; i++)
-            printf("%f, ", nei_distance[bid * K + i]);
-        printf("\n");
-    }
+    // __syncthreads();
+    // if(it == all_it - 1 && bid == 0 && tid == 0){
+    //     for(unsigned i = 0; i < K; i++)
+    //         printf("%f, ", nei_distance[bid * K + i]);
+    //     printf("\n");
+    // }
 }
 
 __global__ void cal_power(half* data_half, float* data_power, unsigned dim, unsigned DIM){
@@ -1405,13 +1405,13 @@ __device__ void Filter_path(unsigned* shared_cand, float* shared_dis, unsigned* 
         }
     }
     if(tid == 0) graph[bid * K] = cur_nei - 1;
-    if(bid == 0 && tid == 0) printf("Cur_nei: %d; tmpid: %d\n", cur_nei, tmp_id);
-    if(bid == 0 && tid == 0) {
-        for(unsigned i = 0; i < cur_nei-1; i++){
-            printf("%d,", final_nei[i]);
-        }
-        printf("\n");
-    }
+    // if(bid == 0 && tid == 0) printf("Cur_nei: %d; tmpid: %d\n", cur_nei, tmp_id);
+    // if(bid == 0 && tid == 0) {
+    //     for(unsigned i = 0; i < cur_nei-1; i++){
+    //         printf("%d,", final_nei[i]);
+    //     }
+    //     printf("\n");
+    // }
 }
 
 __device__ float distance_filter(float res, float dis, float cur_dis, float threshold){
@@ -1574,12 +1574,12 @@ __global__ void filter_reverse(unsigned* graph, unsigned* reverse_graph, half* v
         __syncthreads();
     }
 
-    if(bid == 0 && tid == 0) {
-        for(unsigned i = 0; i < graph[bid * K]; i++){
-            printf("%d,", graph[bid * K + i + 1]);
-        }
-        printf("\n");
-    }
+    // if(bid == 0 && tid == 0) {
+    //     for(unsigned i = 0; i < graph[bid * K]; i++){
+    //         printf("%d,", graph[bid * K + i + 1]);
+    //     }
+    //     printf("\n");
+    // }
 }
 
 __device__ void collect_1hop(unsigned * graph, unsigned K, unsigned* nei0, unsigned* detour_num, unsigned tid, unsigned bid){
@@ -1798,13 +1798,13 @@ __global__ void filter_reverse_1hop(unsigned* graph, unsigned* reverse_graph, un
             graph[bid * d + min(cur_num, d/2) + d/2 + i] = nei_id[i + d/2];
         }
     }
-    __syncthreads();
-    if(bid == 0 && tid == 0){
-        for(unsigned i = 0; i < d; i++){
-            printf("%d,", graph[bid * d + i]);
-        }
-        printf("\n");
-    }
+    // __syncthreads();
+    // if(bid == 0 && tid == 0){
+    //     for(unsigned i = 0; i < d; i++){
+    //         printf("%d,", graph[bid * d + i]);
+    //     }
+    //     printf("\n");
+    // }
 }
 
 __global__ void cal_ep_gpu(unsigned* graph, unsigned* reverse_graph, unsigned* ep, const half* __restrict__ centers, const half* __restrict__ values, unsigned max_cand, unsigned DIM, unsigned TOPM, unsigned K){

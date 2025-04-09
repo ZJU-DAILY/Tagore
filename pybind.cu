@@ -15,7 +15,7 @@ namespace py = pybind11;
 __device__ funcFormat dis_filter=distance_filter;
 __device__ funcFormat ang_filter=angle_filter;
 
-py::tuple GNN_descent(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_DEGREE, unsigned TOPM, char* fname){
+py::tuple GNN_descent(unsigned K, unsigned POINTS, unsigned DIM, unsigned iter, char* fname){
     float* data_load_float = NULL;
     unsigned points_num, dim;
     load_data(fname, data_load_float, points_num, dim);
@@ -95,7 +95,7 @@ py::tuple GNN_descent(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_
     dim3 block3(32, 3, 1);
     dim3 block4(32, 3, 1);
 
-    unsigned all_it = 5, all_it2 = 5;
+    unsigned all_it = iter/2, all_it2 = iter/2;
     auto start = std::chrono::high_resolution_clock::now();
     initialize_graph<<<points_num, 32>>>(graph_dev, points_num, nei_distance, nei_visit, K);
 
@@ -135,7 +135,7 @@ py::tuple GNN_descent(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_
     );
 }
 
-void Pruning(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_DEGREE, unsigned TOPM, py::tuple ptrs, char* fname, string index_type, float thre, char* index_path){
+void Pruning(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_DEGREE, unsigned TOPM, py::tuple ptrs, string index_type, float thre=1.0, char* index_path="index.data"){
 
     // float* data_load_float = NULL;
     unsigned points_num=POINTS;
@@ -213,6 +213,71 @@ void Pruning(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_DEGREE, u
         cudaMemcpy(res_graph.data(), graph_dev, points_num * K * sizeof(unsigned), cudaMemcpyDeviceToHost);
         StoreDPG(index_path, res_graph.data(), points_num, FINAL_DEGREE, K);
     }
+
+    cudaDeviceSynchronize();
+    checkCudaErrors(cudaGetLastError());
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> duration = end - start;
+    std::cout << "time of pruning: " << duration.count() << "s" << std::endl;
+}
+
+void Pruning_with_mode(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_DEGREE, unsigned TOPM, py::tuple ptrs, string mode, string metric, float thre){
+
+    // float* data_load_float = NULL;
+    unsigned points_num=POINTS;
+    // load_data(fname, data_load_float, points_num, dim);
+
+    unsigned* graph_dev = static_cast<unsigned*>(ptrs[0].cast<py::capsule>().get_pointer());
+    unsigned* reverse_graph_dev=static_cast<unsigned*>(ptrs[1].cast<py::capsule>().get_pointer());
+    half* data_dev=static_cast<half*>(ptrs[2].cast<py::capsule>().get_pointer());
+    float* nei_distance=static_cast<float*>(ptrs[3].cast<py::capsule>().get_pointer());
+    float* reverse_distance=static_cast<float*>(ptrs[4].cast<py::capsule>().get_pointer());
+    unsigned* reverse_num=static_cast<unsigned*>(ptrs[5].cast<py::capsule>().get_pointer());
+    half* center_dev=static_cast<half*>(ptrs[6].cast<py::capsule>().get_pointer());
+    unsigned* hybrid_list=static_cast<unsigned*>(ptrs[7].cast<py::capsule>().get_pointer());
+    unsigned* ep_dev;
+    cudaMalloc((void**)&ep_dev, sizeof(unsigned));
+    // refine
+    unsigned ep = 0;
+    // vector<unsigned> res_graph(K * POINTS);
+    // cal_ep(points_num, data_load_float, ep, res_graph.data(), TOPM, DIM, K);
+    
+    funcFormat dis_func, ang_func;
+    cudaMemcpyFromSymbol(&dis_func,dis_filter,sizeof(funcFormat));
+    cudaMemcpyFromSymbol(&ang_func,ang_filter,sizeof(funcFormat));
+
+    vector<unsigned> res_graph(points_num * K);
+
+    dim3 grid_s(points_num, 1, 1);
+    dim3 block_s(32, 4, 1);
+
+    dim3 grid_one(1, 1, 1);
+    auto start = std::chrono::high_resolution_clock::now();
+    if(mode == "path"){
+        cal_ep_gpu<<<grid_one, block_s>>>(graph_dev, reverse_graph_dev, ep_dev, center_dev, data_dev, SELECT_CAND, DIM, TOPM, K);
+        select_path<<<grid_s, block_s>>>(graph_dev, reverse_graph_dev, ep_dev, data_dev, SELECT_CAND, nei_distance, reverse_distance, reverse_num, DIM, FINAL_DEGREE, TOPM, K, thre);
+    }
+    else if(mode == "2-hop"){
+        select_2hop<<<grid_s, block_s>>>(graph_dev, reverse_graph_dev, data_dev, SELECT_CAND, nei_distance, reverse_distance, reverse_num, DIM, FINAL_DEGREE, TOPM, K, thre);
+    }
+
+    else if(mode == "1-hop"){
+        select_1hop_cagra<<<grid_s, block_s>>>(graph_dev, FINAL_DEGREE, reverse_graph_dev, K, reverse_num, hybrid_list);
+    }
+
+    if(metric == "dist"){
+        filter_reverse<<<grid_s, block_s>>>(graph_dev, reverse_graph_dev, data_dev, nei_distance, reverse_distance, reverse_num, DIM, FINAL_DEGREE, K, dis_func, thre);
+    }
+    else if(metric == "angle"){
+        filter_reverse<<<grid_s, block_s>>>(graph_dev, reverse_graph_dev, data_dev, nei_distance, reverse_distance, reverse_num, DIM, FINAL_DEGREE, K, ang_func, thre);
+    }
+    else if(metric == "rank"){
+        filter_reverse_1hop<<<grid_s, block_s>>>(graph_dev, reverse_graph_dev, FINAL_DEGREE, K, reverse_num, hybrid_list);
+    }
+
+    cudaMemcpy(res_graph.data(), graph_dev, points_num * K * sizeof(unsigned), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&ep, ep_dev, sizeof(unsigned), cudaMemcpyDeviceToHost);
+    // StoreNSG(index_path, res_graph.data(), FINAL_DEGREE, ep, points_num, K);
 
     cudaDeviceSynchronize();
     checkCudaErrors(cudaGetLastError());
@@ -313,10 +378,10 @@ void largeIndex(vector<unsigned>& devicelist, unsigned DIM, unsigned K, unsigned
     std::chrono::duration<float> duration = end - start;
     std::cout << "time for indexing: " << duration.count() << "s" << std::endl;
 }
-
 PYBIND11_MODULE(Tagore, m) {
     m.doc() = "Tagore GPU Indexing";
     m.def("GNN_descent", &GNN_descent, "GNN_descent");
-    m.def("Pruning", &Pruning, "Pruning");
+    m.def("Pruning", &Pruning, "Pruning", py::arg("K"), py::arg("POINTS"), py::arg("DIM"), py::arg("FINAL_DEGREE"), py::arg("TOPM")=64, py::arg("ptrs"), py::arg("index_type"), py::arg("thre")=1.0, py::arg("index_path")="index.data");
+    m.def("Pruning_with_mode", &Pruning_with_mode, "Pruning_with_mode");
     m.def("largeIndex", &largeIndex, "largeIndex");
 }
