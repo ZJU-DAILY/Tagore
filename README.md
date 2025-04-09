@@ -58,3 +58,21 @@ Python API
   *  `threshold` - the value of $\alpha$ in Vamana
   *  `final_degree` - the maximal degree of the final index
   *  `m` - the number of neighbor candidates for each node
+
+ Python Example
+ -------------------------------------------------------------------------------
+ * Example 1: constructing a million-scale index using NSG 
+ ```python
+import Tagore
+k = 96
+vector_num = 1000000
+dim = 128
+final_degree = 32
+m = 64
+
+# Initialization: constructing a kNN graph
+gpuPtrs = Tagore.GNN_descent(k, vector_num, dim, 10, 'sift_base.fvecs')
+
+# Pruning: refine the kNN graph using NSG
+Tagore.Pruning(k, vector_num, dim, final_degree, m, gpuPtrs, 'NSG')
+```
