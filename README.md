@@ -64,10 +64,11 @@ Python API
  * Example 1: constructing a million-scale index using NSG 
  ```python
 import Tagore
+
 k = 96
 vector_num = 1000000
 dim = 128
-final_degree = 32
+final_degree = 64
 m = 64
 
 # Initialization: constructing a kNN graph
@@ -76,3 +77,25 @@ gpuPtrs = Tagore.GNN_descent(k, vector_num, dim, 10, 'sift_base.fvecs')
 # Pruning: refine the kNN graph using NSG
 Tagore.Pruning(k, vector_num, dim, final_degree, m, gpuPtrs, 'NSG')
 ```
+
+* Example 2: constructing a billion-scale index using Vamana
+```python
+import Tagore
+
+devicelist = [0, 1, 2, 3] # using 4 GPUs
+dim = 96
+k = 64
+cluster_num = 400
+max_points = 5000000
+data_path_prefix = '../data/cluster'
+local_index_path_prefix = '../index/local_graph'
+index_store_path = '../index/final_index.vamana.gpu'
+max_degree = 22
+buffer_size = 30
+vector_num = 1000000000
+center_path = '../data/centers.bin'
+threshold = 1.2
+final_degree = 32
+m = 64
+
+Tagore.largeIndex(devicelist, dim, k, cluster_num, max_points, data_path_prefix, local_index_path_prefix, index_store_path, max_degree, buffer_size, vector_num, center_path, threshold, final_degree, m)
