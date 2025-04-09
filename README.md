@@ -1,7 +1,7 @@
 Tagore: Scalable Graph Indexing using GPUs for Approximate Nearest Neighbor Search
 ===============================================================================
-Tagore is a library that accelerates scalable graph-based index construction for approximate nearest neighbot search using GPUs. It provides user-friendly Python APIs, enabling seamless integration of GPU acceleration into index construction workflows. 
-Tagore focuses on the acceleration of refinement-based graph indexes such as NSG, NSSG, Vamana, CAGRA, etc. An efficient kNN graph construction algorithm GNN-Descent, a unified pruning acceleration framework, and an asynchronous GPU-CPU-disk pipeline tailored for billion-scale indexing are included in Tagore. 
+Tagore is a library that accelerates scalable graph-based index construction for approximate nearest neighbor search using GPUs. It provides user-friendly Python APIs, enabling seamless integration of GPU acceleration into index construction workflows. 
+Tagore focuses on the acceleration of the mainstream refinement-based graph indexes such as NSG, NSSG, Vamana, CAGRA, etc. An efficient kNN graph construction algorithm GNN-Descent, a unified pruning acceleration framework, and an asynchronous GPU-CPU-disk pipeline tailored for billion-scale indexing are included in Tagore. 
 
 Project Building
 -------------------------------------------------------------------------------
