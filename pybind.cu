@@ -221,7 +221,7 @@ void Pruning(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_DEGREE, u
     std::cout << "time of pruning: " << duration.count() << "s" << std::endl;
 }
 
-void Pruning_with_mode(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_DEGREE, unsigned TOPM, py::tuple ptrs, string mode, string metric, float thre){
+void Pruning_with_CFS(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_DEGREE, unsigned TOPM, py::tuple ptrs, string mode, string metric, float thre){
 
     // float* data_load_float = NULL;
     unsigned points_num=POINTS;
@@ -382,6 +382,6 @@ PYBIND11_MODULE(Tagore, m) {
     m.doc() = "Tagore GPU Indexing";
     m.def("GNN_descent", &GNN_descent, "GNN_descent");
     m.def("Pruning", &Pruning, "Pruning", py::arg("K"), py::arg("POINTS"), py::arg("DIM"), py::arg("FINAL_DEGREE"), py::arg("TOPM")=64, py::arg("ptrs"), py::arg("index_type"), py::arg("thre")=1.0, py::arg("index_path")="index.data");
-    m.def("Pruning_with_mode", &Pruning_with_mode, "Pruning_with_mode");
+    m.def("Pruning_with_CFS", &Pruning_with_CFS, "Pruning_with_CFS");
     m.def("largeIndex", &largeIndex, "largeIndex");
 }
