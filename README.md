@@ -32,7 +32,7 @@ Python API
   * `index_type` - constructed index type, including 'NSG', 'NSSG', 'Vamana', 'CAGRA', and 'DPG'
   * `threshold` - parameter during pruning, for example $\alpha$ in 'Vamana' and 'NSSG'
   * `index_path` - path to store the index
-* `Tagore.Pruning_with_mode(k, num, dim, final_degree, m, ptrs, mode, metric, threshold)` - pruning the initialized kNN graph with the CFS(Collect-Filter-Store) framework introduced in our paper
+* `Tagore.Pruning_with_CFS(k, num, dim, final_degree, m, ptrs, mode, metric, threshold)` - pruning the initialized kNN graph with the CFS(Collect-Filter-Store) framework introduced in our paper
   * `k` - degree of the kNN graph
   * `num` - the number of vectors in the used dataset
   * `dim` - the dimension of vectors
@@ -78,7 +78,24 @@ gpuPtrs = Tagore.GNN_descent(k, vector_num, dim, 10, 'sift_base.fvecs')
 Tagore.Pruning(k, vector_num, dim, final_degree, m, gpuPtrs, 'NSG')
 ```
 
-* Example 2: constructing a billion-scale index using Vamana
+ * Example 2: constructing a million-scale index using NSG (CFS version) 
+ ```python
+import Tagore
+
+k = 96
+vector_num = 1000000
+dim = 128
+final_degree = 64
+m = 64
+
+# Initialization: constructing a kNN graph
+gpuPtrs = Tagore.GNN_descent(k, vector_num, dim, 10, 'sift_base.fvecs')
+
+# Pruning: refine the kNN graph using NSG; the underlying implementation follows the CFS procedure 
+Tagore.Pruning_with_CFS(k, vector_num, dim, final_degree, m, gpuPtrs, 'path', 'dist', 1.0)
+```
+
+* Example 3: constructing a billion-scale index using Vamana
 ```python
 import Tagore
 
