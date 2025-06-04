@@ -124,7 +124,8 @@ Currently, Tagore has 5 built-in indexing methods: [NSG](https://www.vldb.org/pv
 
 For existing methods that can reuse the built-in parameter options, we use two examples to illustrate how to implement a pruning strategy by adding a few lines of code. 
 
-(1) $\alpha$-[pruning strategy](https://arxiv.org/abs/2410.01231) 
+(1) $\alpha$-pruning strategy [[VLDB'25](https://arxiv.org/abs/2410.01231)] 
+
 Add the pruning condition as listed below into `./src/Tagore_src.cu`:
 ```cpp
 // d_vw, d_uv, d_uw are the square of the distances between nodes u, v, w; threshold = cos(alpha)
@@ -134,7 +135,8 @@ __device__ float alpha_filter(float d_vw, float d_uv, float d_uw, float threshol
 ```
   This function can be passed as a parameter to the Filter operation, without any other modification of the Filter function. 
 
-(2) $\tau$-[MNG](https://dl.acm.org/doi/abs/10.1145/3588908)
+(2) $\tau$-MNG [[SIGMOD'23](https://dl.acm.org/doi/abs/10.1145/3588908)]
+
 Add the pruning condition as listed below into `./src/Tagore_src.cu`:
 ```cpp
 // d_vw, d_uv, d_uw are the square of the distances between nodes u, v, w; tau is a parameter set by the user
