@@ -116,3 +116,39 @@ final_degree = 32
 m = 64
 
 Tagore.largeIndex(devicelist, dim, k, cluster_num, max_points, data_path_prefix, local_index_path_prefix, index_store_path, max_degree, buffer_size, vector_num, center_path, threshold, final_degree, m)
+```
+
+Extension to Other Refinement-based Indexes
+-------------------------------------------------------------------------------
+Currently, Tagore has 5 built-in indexing methods: [NSG](https://www.vldb.org/pvldb/vol12/p461-fu.pdf), [Vamana](https://papers.nips.cc/paper_files/paper/2019/hash/09853c7fb1d3f8ee67a61b6bf4a7f8e6-Abstract.html), [CAGRA](https://arxiv.org/abs/2308.15136), [NSSG](https://arxiv.org/abs/1907.06146), and [DPG](https://ieeexplore.ieee.org/document/8681160). With the CFS framework, Tagore supports other refinement-based index construction methods and potential new algorithms. 
+
+For existing methods that can reuse the built-in parameter options, we use two examples to illustrate how to implement a pruning strategy by adding a few lines of code. 
+
+(1) $\alpha$-[pruning strategy](https://arxiv.org/abs/2410.01231) 
+Add the pruning condition as listed below into `./src/Tagore_src.cu`:
+```cpp
+// d_vw, d_uv, d_uw are the square of the distances between nodes u, v, w; threshold = cos(alpha)
+__device__ float alpha_filter(float d_vw, float d_uv, float d_uw, float threshold){ 
+    return (((d_vw - d_uv < 0) | (d_uw - d_uv < 0) | ((d_vw + d_uw - d_uv) / 2 / sqrt(d_vw * d_uw) < threshold)) ? -1.0 : 1.0);
+}
+```
+  This function can be passed as a parameter to the Filter operation, without any other modification of the Filter function. 
+
+(2) $\tau$-[MNG](https://dl.acm.org/doi/abs/10.1145/3588908)
+Add the pruning condition as listed below into `./src/Tagore_src.cu`:
+```cpp
+// d_vw, d_uv, d_uw are the square of the distances between nodes u, v, w; tau is a parameter set by the user
+__device__ float tau_filter(float d_vw, float d_uv, float d_uw, float tau){ 
+    return ((d_uw - d_uv < 0) | (d_vw - d_uv + 3 * tau < 0) ? -1.0 : 1.0);
+}
+```
+  Besides this function, we need to add one line of code in the Filter function within `./src/Tagore_src.cu` as below  
+```cpp
+......
+while(cur_nei < FINAL_DEGREE) {
+    // the added line
+    if(cur_nei_dis <= 3 * tau) continue; // cur_nei_dis is the distance between nodes u and v
+......
+}
+```
+For potential newly proposed algorithms beyond the implementation of the built-in options, one can override the `Collect` or `Filter` functions within the CFS framework. 
