@@ -120,7 +120,7 @@ Tagore.largeIndex(devicelist, dim, k, cluster_num, max_points, data_path_prefix,
 
 Extension to Other Refinement-based Indexes
 -------------------------------------------------------------------------------
-Currently, Tagore has 5 built-in indexing methods: [NSG](https://www.vldb.org/pvldb/vol12/p461-fu.pdf), [Vamana](https://papers.nips.cc/paper_files/paper/2019/hash/09853c7fb1d3f8ee67a61b6bf4a7f8e6-Abstract.html), [CAGRA](https://arxiv.org/abs/2308.15136), [NSSG](https://arxiv.org/abs/1907.06146), and [DPG](https://ieeexplore.ieee.org/document/8681160). With the CFS framework, Tagore supports other refinement-based index construction methods and potential new algorithms. 
+Currently, Tagore has 5 built-in indexing methods: [NSG](https://www.vldb.org/pvldb/vol12/p461-fu.pdf), [Vamana](https://papers.nips.cc/paper_files/paper/2019/hash/09853c7fb1d3f8ee67a61b6bf4a7f8e6-Abstract.html), [CAGRA](https://arxiv.org/abs/2308.15136), [NSSG](https://arxiv.org/abs/1907.06146), and [DPG](https://ieeexplore.ieee.org/document/8681160). With the CFS framework, one can extend Tagore to other refinement-based index construction methods and potential new algorithms. 
 
 For existing methods that can reuse the built-in parameter options, we use two examples to illustrate how to implement a pruning strategy by adding a few lines of code. 
 
