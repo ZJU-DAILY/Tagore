@@ -141,7 +141,7 @@ Add the pruning condition as listed below into `./src/Tagore_src.cu`:
 ```cpp
 // d_vw, d_uv, d_uw are the square of the distances between nodes u, v, w; tau is a parameter set by the user
 __device__ float tau_filter(float d_vw, float d_uv, float d_uw, float tau){ 
-    return ((d_uw - d_uv < 0) | (d_vw - d_uv + 3 * tau < 0) ? -1.0 : 1.0);
+    return (((d_uw - d_uv < 0) | (d_vw - d_uv + 3 * tau < 0)) ? -1.0 : 1.0);
 }
 ```
   Besides this function, we need to add one line of code in the Filter function within `./src/Tagore_src.cu` as below  
