@@ -22,6 +22,7 @@ __device__ void swap_bool(bool &a, bool &b){
     b = t;
 }
 
+// bitonic sort by distance within thread block
 __device__ void bitonic_sort_new2(float* shared_arr, unsigned* ids, unsigned* ids2, unsigned len){
     const unsigned tid = threadIdx.y * blockDim.x + threadIdx.x;
     // if(tid < len / 2){
@@ -45,6 +46,7 @@ __device__ void bitonic_sort_new2(float* shared_arr, unsigned* ids, unsigned* id
     // __syncthreads();
 }
 
+// bitonic sort by id within thread block
 __device__ void bitonic_sort_id_new2(unsigned* shared_arr, unsigned len){
     const unsigned tid = threadIdx.y * blockDim.x + threadIdx.x;
         for(unsigned stride = 1; stride < len; stride <<= 1){
@@ -63,6 +65,7 @@ __device__ void bitonic_sort_id_new2(unsigned* shared_arr, unsigned len){
         }
 }
 
+// bitonic sort id by distance within thread block
 __device__ void bitonic_sort_id_by_dis(float* shared_arr, unsigned* ids, bool* visit, unsigned len){
     const unsigned tid = threadIdx.y * blockDim.x + threadIdx.x;
     for(unsigned stride = 1; stride < len; stride <<= 1){
@@ -83,6 +86,7 @@ __device__ void bitonic_sort_id_by_dis(float* shared_arr, unsigned* ids, bool* v
     }
 }
 
+// bitonic sort id by distance within thread block
 __device__ void bitonic_sort_id_and_dis(float* shared_arr, unsigned* ids, unsigned len){
     const unsigned tid = threadIdx.y * blockDim.x + threadIdx.x;
     for(unsigned stride = 1; stride < len; stride <<= 1){
@@ -102,6 +106,7 @@ __device__ void bitonic_sort_id_and_dis(float* shared_arr, unsigned* ids, unsign
     }
 }
 
+// bitonic sort distance by id within thread block
 __device__ void bitonic_sort_by_id(float* shared_arr, unsigned* ids, unsigned len){
     const unsigned tid = threadIdx.y * blockDim.x + threadIdx.x;
     for(unsigned stride = 1; stride < len; stride <<= 1){
@@ -121,6 +126,7 @@ __device__ void bitonic_sort_by_id(float* shared_arr, unsigned* ids, unsigned le
     }
 }
 
+// bitonic sort id by detour within thread block
 __device__ void bitonic_sort_id_by_detour(unsigned* shared_arr, unsigned* ids, unsigned len){
     const unsigned tid = threadIdx.y * blockDim.x + threadIdx.x;
     for(unsigned stride = 1; stride < len; stride <<= 1){
@@ -140,6 +146,7 @@ __device__ void bitonic_sort_id_by_detour(unsigned* shared_arr, unsigned* ids, u
     }
 }
 
+// Initialize the neighbor lists in graph index using the GPU
 __device__ inline unsigned cinn_nvgpu_uniform_random(unsigned long long seed, unsigned node_num){
     curandStatePhilox4_32_10_t state;
     int idx = threadIdx.x + threadIdx.y * blockDim.x + blockIdx.x * blockDim.x * blockDim.y;
@@ -147,6 +154,7 @@ __device__ inline unsigned cinn_nvgpu_uniform_random(unsigned long long seed, un
     return (unsigned)(((float)node_num) * curand_uniform(&state)) % node_num;
 }
 
+// Initialize the graph index using the GPU
 __global__ void initialize_graph(unsigned* graph, unsigned node_num, float* nei_distance, bool* nei_visit, unsigned K){
     unsigned bid = blockIdx.x, laneid = threadIdx.x, tid = threadIdx.x + threadIdx.y * blockDim.x; 
     for(unsigned i = tid; i < K; i += blockDim.x * blockDim.y){
@@ -157,6 +165,16 @@ __global__ void initialize_graph(unsigned* graph, unsigned node_num, float* nei_
     }
 }
 
+/*
+sample_kernel6:
+Phase 2 of GNNDescent, where each node is individually applied
+The main processes are as follows:
+1. Select several neighbors for iterative computation from the graph/reverse_graph and remove duplicates.
+2. Merge the original neighbor list and the sample neighbor list into shared memory, and perform deduplication and sorting via bitonic_sort_id_new2.
+3. For nodes requiring distance calculation, compute the distance between two points as needed.
+4. After updating the distances, merge them into the current neighbor list through binary insertion and other methods, and make corresponding updates in the reverse_graph.
+5. Finally, obtain the updated neighbor graph.
+*/
 __global__ void sample_kernel6(unsigned* graph, unsigned* reverse_graph, unsigned it, const half* __restrict__ values, unsigned node_num, unsigned all_it, float* nei_distance, float* reverse_distance, bool* nei_visit, unsigned* reverse_num, unsigned DIM, unsigned K){
     unsigned tmp_it = threadIdx.y/4;
     unsigned bid = blockIdx.x, laneid = threadIdx.x, tid = threadIdx.x + threadIdx.y * blockDim.x;
@@ -389,6 +407,14 @@ __global__ void reset_reverse_num(unsigned* reverse_num, unsigned POINTS){
     }
 }
 
+/*
+merge_reverse_plus:
+This process involves fusing forward information (graph, nei_distance) and reverse information (reverse_graph, reverse_distance) to update the neighbor table of each node.
+The main steps are as follows:
+1. Retrieve the top K forward neighbors and reverse neighbors of the current node from shared memory.
+2. Eliminate duplicates and merge reverse neighbors through operations such as bitonic_sort_by_id and binary insertion.
+3. Rewrite the merged results into the global nei_distance and graph.
+*/
 __global__ void merge_reverse_plus(unsigned* graph, unsigned* reverse_graph, float* nei_distance, float* reverse_distance, unsigned* reverse_num, unsigned K){
     unsigned bid = blockIdx.x, laneid = threadIdx.x, tid = threadIdx.x + threadIdx.y * blockDim.x;
     __shared__ unsigned graph_nei[K_SIZE], reverse_nei[K_SIZE], new_list2[K_SIZE];
@@ -491,6 +517,15 @@ __global__ void reset_reverse_new_old_num(unsigned* reverse_num, unsigned* rever
     }
 }
 
+/*
+nn_descent_opt_sample:
+Sampling function in a sub-stage of Phase 1 in GNNDescent.
+General process:
+Distinguish between "new" and "old" neighbors from the neighbors of a node (using the nei-visit flag);
+Save them separately in multiple sets of shared memory (or global memory) for subsequent calculations;
+Update the reverse_num of these sampled neighbors using atomic operations and write it to the reverse_graph;
+New_num_global/old_num_global records the number of new and old neighbor samples for each node.
+*/
 __global__ void nn_descent_opt_sample(unsigned* graph, unsigned* reverse_graph, bool* nei_visit, unsigned* reverse_num, unsigned* reverse_num_old,unsigned* new_num_global,unsigned* old_num_global, unsigned* hybrid_list, unsigned K){
     unsigned bid = blockIdx.x, laneid = threadIdx.x, tid = threadIdx.x + threadIdx.y * blockDim.x;
     __shared__ unsigned new_nn[SAMPLE], old_nn[SAMPLE];
@@ -556,6 +591,13 @@ __global__ void nn_descent_opt_sample(unsigned* graph, unsigned* reverse_graph, 
     }
 }
 
+/*
+nn_descent_opt_reverse_sample:
+Sub-stage in Phase 1. For the new and old neighbors sampled in the previous step, perform another merging and deduplication operation in reverse_graph to further expand the candidate set.
+General process:
+1.Create a backup of new_nn/old_nn first, and then search and deduplicate the corresponding reverse_graph entries.
+2.Write it back to new_num_global/old_num_global for subsequent kernel functions.
+*/
 __global__ void nn_descent_opt_reverse_sample(unsigned* graph, unsigned* reverse_graph, unsigned* reverse_num, unsigned* reverse_num_old, unsigned* new_num_global,unsigned* old_num_global,unsigned* hybrid_list,unsigned K){
     unsigned bid = blockIdx.x, laneid = threadIdx.x, tid = threadIdx.x + threadIdx.y * blockDim.x;
     __shared__ unsigned new_nn[SAMPLE], old_nn[SAMPLE];
@@ -629,6 +671,14 @@ __global__ void nn_descent_opt_reverse_sample(unsigned* graph, unsigned* reverse
     }
 }
 
+/*
+nn_descent_opt_cal:
+In Phase 1 of GNNDescent, the part that calculates the distance between new and old neighbor pairs is typically accelerated by matrix multiplication using Tensor Core (wmma) (converting Euclidean distance into inner product correlation operation to reduce computational complexity).
+General process:
+1. Load the vector data of new_nn and old_nn into shared memory;
+2. Make full use of wmma:: fragments to perform block matrix multiplication, and convert the computed dist (a, b)=||a|| ^ 2 + ||b|| ^ 2 - 2 · a · b into data block multiplication;
+3. After processing is completed, write the calculated partial shortest distance back to reverse-distance using shfl_sync and atomicAdd, and modify the relevant entries in reverse_graph.
+*/
 __global__ void nn_descent_opt_cal(unsigned* graph, unsigned* reverse_graph, half* data, float* data_power, unsigned it, float* reverse_distance, unsigned* reverse_num, unsigned* new_num_global, unsigned* old_num_global, unsigned* hybrid_list, unsigned DIM, unsigned K){
     unsigned bid = blockIdx.x, laneid = threadIdx.x, tid = threadIdx.x + threadIdx.y * blockDim.x, warp_id_x = threadIdx.y / 4, warp_id_y = threadIdx.y % 4;
     __shared__ unsigned new_nn[SAMPLE * 2], old_nn[2* SAMPLE];
@@ -977,6 +1027,14 @@ __global__ void nn_descent_opt_cal(unsigned* graph, unsigned* reverse_graph, hal
     }
 }
 
+/*
+nn_descent_opt_merge
+The candidate generated after one update in Phase 1 of GNNDescent (reverse_graph/reverse-distance) is then merged with the current neighbors to obtain new adjacent lists.
+General process:
+1. Filter neighbors have no potential to be updated in shared memory based on min_ele (the maximum distance among the current k-NN neighbors);
+2. Use Bitonic sorting and binary search to remove duplicates and insert them into the neighbor list of the graph;
+3. Perform a unified reordering and write back of the newly merged data.
+*/
 __global__ void nn_descent_opt_merge(unsigned* graph, unsigned* reverse_graph, unsigned it, unsigned all_it, float* nei_distance, float* reverse_distance, bool* nei_visit, unsigned* reverse_num, unsigned K){
     unsigned bid = blockIdx.x, laneid = threadIdx.x, tid = threadIdx.x + threadIdx.y * blockDim.x;
     __shared__ unsigned new_list_shared[RESERVENUM], new_list2[RESERVENUM], nei_list_shared[K_SIZE];
@@ -1097,6 +1155,7 @@ __global__ void nn_descent_opt_merge(unsigned* graph, unsigned* reverse_graph, u
     // }
 }
 
+// calculate the quadratic sum of each vector in the vector dataset
 __global__ void cal_power(half* data_half, float* data_power, unsigned dim, unsigned DIM){
     unsigned bid = blockIdx.x, tid = threadIdx.x;
     __shared__ half shared_val[(DIM_SIZE + 31) / 32];
@@ -1119,6 +1178,7 @@ __global__ void cal_power(half* data_half, float* data_power, unsigned dim, unsi
 
 }
 
+// calculate the reverse graph based on the graph
 __global__ void do_reverse_graph(unsigned* graph_dev, unsigned* reverse_graph_dev, float* nei_distance, float* reverse_distance, unsigned* reverse_num, unsigned K){
     unsigned bid = blockIdx.x, tid = threadIdx.x + threadIdx.y * blockDim.x;
     for(unsigned i = tid; i < K; i += blockDim.x * blockDim.y){
@@ -1140,6 +1200,7 @@ __global__ void reset_visit_reversenum(unsigned* reverse_graph, bool* nei_visit,
     if(tid == 0) reverse_num[bid] = 0;
 }
 
+// C in CFS framework: collect candidates from the path of search kNN neighbors 
 __device__ void collect_path(unsigned* shared_cand, float* shared_dis, unsigned* final_nei, float* final_dis, unsigned* top_M_Cand, unsigned* top_M_Cand2, float* top_M_Cand_dis, bool* has_explore, half4* tmp_val_sha, unsigned tid, unsigned bid, unsigned laneid, unsigned K, unsigned DIM, unsigned TOPM, unsigned* ep, unsigned* graph, const half* __restrict__  values, unsigned max_cand, float* nei_distance){
     __shared__ unsigned curr_of_candset, to_explore;
     for(unsigned i = tid; i < K; i += blockDim.x * blockDim.y){
@@ -1282,6 +1343,7 @@ __device__ void collect_path(unsigned* shared_cand, float* shared_dis, unsigned*
     }
 }
 
+// C in CFS framework: collect candidates from the 2-hop neighbors 
 __device__ void collect_2hop(unsigned* shared_cand, float* shared_dis, half4* tmp_val_sha, unsigned tid, unsigned bid, unsigned laneid, unsigned K, unsigned DIM, unsigned* graph, const half* __restrict__  values, float* nei_distance){
     for(unsigned i = tid; i < K; i += blockDim.x * blockDim.y){
         shared_cand[i] = graph[bid * K + i];
@@ -1328,6 +1390,7 @@ __device__ void collect_2hop(unsigned* shared_cand, float* shared_dis, half4* tm
     }
 }
 
+// F in CFS framework: wavefront-parallel GPU kernel; filter the candidates collected in the last step 
 __device__ void Filter_path(unsigned* shared_cand, float* shared_dis, unsigned* final_nei, float* final_dis, half4* tmp_val_sha, unsigned tid, unsigned bid, unsigned laneid, unsigned K, unsigned DIM, unsigned FINAL_DEGREE, unsigned* graph, const half* __restrict__  values, float* nei_distance, unsigned* reverse_num, unsigned* reverse_graph, float* reverse_distance, float (*operat)(float,float,float,float), float threshold){
     __shared__ unsigned cur_nei;
     __shared__ unsigned tmp_id;
@@ -1414,15 +1477,17 @@ __device__ void Filter_path(unsigned* shared_cand, float* shared_dis, unsigned* 
     // }
 }
 
+// distance-based filter function
 __device__ float distance_filter(float res, float dis, float cur_dis, float threshold){
     return ((threshold * res) - dis);
 }
 
+// angle-based filter function
 __device__ float angle_filter(float res, float dis, float cur_dis, float threshold){
     return threshold - (dis + cur_dis - res) / 2 / sqrtf(dis * cur_dis);
 }
 
-
+// aggregate the Collect and Filter functions for path
 __global__ void select_path(unsigned* graph, unsigned* reverse_graph, unsigned *ep, const half* __restrict__ values, unsigned max_cand, float* nei_distance, float* reverse_distance, unsigned* reverse_num, unsigned DIM, unsigned FINAL_DEGREE, unsigned TOPM, unsigned K, float thre){
     __shared__ unsigned shared_cand[SELECT_CAND+K_SIZE];
     __shared__ float shared_dis[SELECT_CAND+K_SIZE];
@@ -1444,6 +1509,7 @@ __global__ void select_path(unsigned* graph, unsigned* reverse_graph, unsigned *
     
 }
 
+// aggregate the Collect and Filter functions for 2-hop neighbors
 __global__ void select_2hop(unsigned* graph, unsigned* reverse_graph, const half* __restrict__ values, unsigned max_cand, float* nei_distance, float* reverse_distance, unsigned* reverse_num, unsigned DIM, unsigned FINAL_DEGREE, unsigned TOPM, unsigned K, float thre){
     __shared__ unsigned shared_cand[SELECT_CAND+K_SIZE];
     __shared__ float shared_dis[SELECT_CAND+K_SIZE];
@@ -1460,6 +1526,7 @@ __global__ void select_2hop(unsigned* graph, unsigned* reverse_graph, const half
     Filter_path(shared_cand, shared_dis, final_nei, final_dis, tmp_val_sha, tid, bid, laneid, K, DIM, FINAL_DEGREE, graph, values, nei_distance, reverse_num, reverse_graph, reverse_distance, angle_filter, thre);
 }
 
+// append reverse neighbors to the current neighbors using the filter function
 __global__ void filter_reverse(unsigned* graph, unsigned* reverse_graph, half* values, float* nei_distance, float* reverse_distance, unsigned* reverse_num, unsigned DIM, unsigned FINAL_DEGREE, unsigned K, funcFormat operat, float threshold){
     __shared__ unsigned shared_cand[SELECT_CAND+K_SIZE];
     __shared__ float shared_dis[SELECT_CAND+K_SIZE];
@@ -1582,6 +1649,7 @@ __global__ void filter_reverse(unsigned* graph, unsigned* reverse_graph, half* v
     // }
 }
 
+// C in the CFS framework: collect the 1-hop neighbors
 __device__ void collect_1hop(unsigned * graph, unsigned K, unsigned* nei0, unsigned* detour_num, unsigned tid, unsigned bid){
     for(unsigned j = tid; j < K; j += blockDim.x * blockDim.y){
         nei0[j] = graph[bid * K + j];
@@ -1589,6 +1657,7 @@ __device__ void collect_1hop(unsigned * graph, unsigned K, unsigned* nei0, unsig
     }
 }
 
+// F in CFS framework: filter the neighbors of CAGRA
 __device__ void filter_cagra(unsigned* nei0, unsigned* nei1, unsigned* nei2, unsigned* detour_num, unsigned* graph, unsigned K, unsigned d, unsigned* reverse_num, unsigned* reverse_graph, unsigned* new_list, unsigned tid, unsigned bid){
     for(unsigned i = 0; i < K / 2; i++){
         unsigned nei_id1 = graph[bid * K + i], nei_id2 = graph[bid * K + K - 1 - i];
@@ -1633,6 +1702,7 @@ __device__ void filter_cagra(unsigned* nei0, unsigned* nei1, unsigned* nei2, uns
     }
 }
 
+// F in CFS framework: filter the neighbors of DPG
 __device__ void filter_dpg(unsigned* nei0, unsigned* nei1, unsigned* nei2, unsigned* detour_num, unsigned* graph, unsigned K, unsigned d, unsigned* reverse_num, unsigned* reverse_graph, unsigned* new_list, unsigned tid, unsigned bid, unsigned laneid, unsigned DIM, const half* __restrict__ values, float* nei_distance){
     __shared__ half4 tmp_val_sha[DIM_SIZE / 4];
     for(unsigned i = threadIdx.y; i < K / 2; i += blockDim.y){
@@ -1731,6 +1801,7 @@ __global__ void select_1hop_dpg(unsigned* graph, unsigned d, unsigned* reverse_g
     filter_dpg(nei0, nei1, nei2, detour_num, graph, K, d, reverse_num, reverse_graph, new_list, tid, bid, laneid, DIM, values, nei_distance);
 }
 
+// append reverse neighbors to the current neighbors using the filter function
 __global__ void filter_reverse_1hop(unsigned* graph, unsigned* reverse_graph, unsigned d, unsigned K, unsigned* reverse_num, unsigned* new_list){
     __shared__ unsigned nei_id[K_SIZE];
     __shared__ unsigned reverse_nei[K_SIZE];
@@ -1807,6 +1878,7 @@ __global__ void filter_reverse_1hop(unsigned* graph, unsigned* reverse_graph, un
     // }
 }
 
+// calculate the entry point (central point) of a graph index
 __global__ void cal_ep_gpu(unsigned* graph, unsigned* reverse_graph, unsigned* ep, const half* __restrict__ centers, const half* __restrict__ values, unsigned max_cand, unsigned DIM, unsigned TOPM, unsigned K){
     __shared__ unsigned shared_cand[SELECT_CAND+K_SIZE];
     __shared__ float shared_dis[SELECT_CAND+K_SIZE];
