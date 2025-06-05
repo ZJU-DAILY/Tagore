@@ -2,6 +2,7 @@
 
 using namespace std;
 
+// From the source code of NSG: load data in fvecs format
 void load_data(char* filename, float*& data, unsigned& num,unsigned& dim){// load data with sift10K pattern
     std::ifstream in(filename, std::ios::binary);
     if(!in.is_open()){std::cout<<"open file error"<<std::endl;exit(-1);}
@@ -20,6 +21,7 @@ void load_data(char* filename, float*& data, unsigned& num,unsigned& dim){// loa
     in.close();
 }
 
+// From the source code of NSG: insert neighbors
 static inline int InsertIntoPool (Neighbor *addr, unsigned k, Neighbor nn) {
     // find the location to insert
     int left=0,right=k-1;
@@ -49,7 +51,8 @@ static inline int InsertIntoPool (Neighbor *addr, unsigned k, Neighbor nn) {
     addr[right]=nn;
     return right;
 }
-  
+
+// From the source code of NSG: compute the distance between two vectors
 float compare(float* a, float* b, unsigned dim){
     float res = 0.0;
     for(unsigned i = 0; i < dim; i++){
@@ -58,6 +61,7 @@ float compare(float* a, float* b, unsigned dim){
     return sqrt(res);
 }
 
+// From the source code of NSG: perform k-NN search
 void get_neighbors(float *query, unsigned* final_graph_, float* data_, unsigned ep_, unsigned nd_, unsigned L, unsigned DIM, unsigned K,
     boost::dynamic_bitset<> &flags,
     std::vector<Neighbor> &retset,
@@ -122,7 +126,7 @@ void get_neighbors(float *query, unsigned* final_graph_, float* data_, unsigned 
     }
 }
 
-    
+// From the source code of NSG: calculate the entry point
 void cal_ep(unsigned points, float* data, unsigned& ep_, unsigned* graph, unsigned L, unsigned DIM, unsigned K) {
     float *center = new float[DIM];
     for (unsigned j = 0; j < DIM; j++) center[j] = 0;
@@ -143,6 +147,7 @@ void cal_ep(unsigned points, float* data, unsigned& ep_, unsigned* graph, unsign
     cout << "ep: " << ep_ << endl;
 }
 
+// store NSG index into files
 void StoreNSG(const char *filename, unsigned* graph, unsigned width, unsigned ep_, unsigned points, unsigned K) {
     std::ofstream out(filename, std::ios::binary | std::ios::out);
     
@@ -156,6 +161,7 @@ void StoreNSG(const char *filename, unsigned* graph, unsigned width, unsigned ep
     out.close();
 }
 
+// store Vamana index into files
 void StoreVamana(const char *filename, unsigned* graph, unsigned ep_, unsigned points, size_t num_frozen_points, unsigned K){
 
     std::ofstream out(filename, std::ios::binary | std::ios::out);
@@ -185,6 +191,7 @@ void StoreVamana(const char *filename, unsigned* graph, unsigned ep_, unsigned p
     out.close();
 }
 
+// store NSSG index into files
 void StoreNSSG(const char *filename, unsigned* graph, unsigned width, unsigned points, unsigned K) {
     std::ofstream out(filename, std::ios::binary | std::ios::out);
     
@@ -208,6 +215,7 @@ void StoreNSSG(const char *filename, unsigned* graph, unsigned width, unsigned p
     cout << endl;
 }
 
+// store DPG index into files
 void StoreDPG(const char *filename, unsigned* graph, unsigned N, unsigned degree, unsigned K){
     ofstream os(filename, ios::binary);
     char const *KGRAPH_MAGIC = "KNNGRAPH";
@@ -228,6 +236,7 @@ void StoreDPG(const char *filename, unsigned* graph, unsigned N, unsigned degree
     os.close();
 }
 
+// store CAGRA index into files
 void StoreCAGRA(const char* filename, unsigned* graph, unsigned points_num, unsigned degree, unsigned K){
     std::ofstream out(filename, std::ios::binary | std::ios::out);
     for (unsigned i = 0; i < points_num; i++) {
