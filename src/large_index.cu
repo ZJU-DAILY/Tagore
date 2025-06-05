@@ -4,7 +4,7 @@ using namespace std;
 
 /*
 Algorithm 4 in the paper: cluster-aware dispatching strategy
-This function reorders the clusters based on their overlapped nodes
+This function reorders the clusters based on their overlapping nodes
 */
 void reorder(vector<map<unsigned, unsigned>>& intersect, unsigned cluster_num, unsigned buffer_size, unsigned ini, vector<unsigned>& result, vector<unsigned>& position){
     vector<unsigned> buffer;
