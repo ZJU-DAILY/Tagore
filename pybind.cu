@@ -15,10 +15,12 @@ namespace py = pybind11;
 __device__ funcFormat dis_filter=distance_filter;
 __device__ funcFormat ang_filter=angle_filter;
 
+// GNN-Descent algorithm implemented by using the related GPU kernels.
 py::tuple GNN_descent(unsigned K, unsigned POINTS, unsigned DIM, unsigned iter, char* fname){
     float* data_load_float = NULL;
     unsigned points_num, dim;
     load_data(fname, data_load_float, points_num, dim);
+    // adjust the data range
     float tmp_ave = 0.0;
     for(unsigned i = 0; i < dim; i++)
         tmp_ave += abs(data_load_float[i]);
@@ -34,6 +36,7 @@ py::tuple GNN_descent(unsigned K, unsigned POINTS, unsigned DIM, unsigned iter, 
     }
     cout << "Points: " << points_num << ", Dim: " << dim << endl;
     
+    // calculate the central point in the dataset
     float *center = new float [DIM];
     half *center_half = new half[DIM];
     for (unsigned j = 0; j < DIM; j++) center[j] = 0;
@@ -98,9 +101,10 @@ py::tuple GNN_descent(unsigned K, unsigned POINTS, unsigned DIM, unsigned iter, 
     unsigned all_it = iter/2, all_it2 = iter/2;
     auto start = std::chrono::high_resolution_clock::now();
     initialize_graph<<<points_num, 32>>>(graph_dev, points_num, nei_distance, nei_visit, K);
-
+    
     cal_power<<<points_num, DIM>>>(data_dev, data_power_dev, dim, DIM);
-
+    
+    // Phase 1
     for(unsigned it = 0; it < all_it; it++){
         nn_descent_opt_sample<<<points_num, 32>>>(graph_dev, reverse_graph_dev, nei_visit ,reverse_num, reverse_num_old, new_num_global, old_num_global, hybrid_list, K);
         nn_descent_opt_reverse_sample<<<points_num, 32>>>(graph_dev, reverse_graph_dev, reverse_num, reverse_num_old, new_num_global, old_num_global, hybrid_list, K);
@@ -111,6 +115,8 @@ py::tuple GNN_descent(unsigned K, unsigned POINTS, unsigned DIM, unsigned iter, 
     }
     do_reverse_graph<<<points_num, 32>>>(graph_dev, reverse_graph_dev, nei_distance, reverse_distance, reverse_num, K);
     reset_visit_reversenum<<<points_num, 32>>>(reverse_graph_dev, nei_visit, reverse_num, POINTS, K);
+
+    // Phase 2
     for(unsigned it = 0; it < all_it2; it++){
         sample_kernel6<<<grid, block>>>(graph_dev, reverse_graph_dev, it, data_dev, points_num, all_it2, nei_distance, reverse_distance, nei_visit, reverse_num, DIM, K);
         if(it < all_it2 - 1) reset_reverse_num<<<1000, 1024>>>(reverse_num,POINTS);
@@ -135,6 +141,7 @@ py::tuple GNN_descent(unsigned K, unsigned POINTS, unsigned DIM, unsigned iter, 
     );
 }
 
+// Implement the pruning API of Python. 
 void Pruning(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_DEGREE, unsigned TOPM, py::tuple ptrs, string index_type, float thre=1.0, char* index_path="index.data"){
 
     // float* data_load_float = NULL;
@@ -221,6 +228,7 @@ void Pruning(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_DEGREE, u
     std::cout << "time of pruning: " << duration.count() << "s" << std::endl;
 }
 
+// Implement pruning strategies in Table 1 using the CFS framework 
 void Pruning_with_CFS(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_DEGREE, unsigned TOPM, py::tuple ptrs, string mode, string metric, float thre){
 
     // float* data_load_float = NULL;
@@ -286,6 +294,7 @@ void Pruning_with_CFS(unsigned K, unsigned POINTS, unsigned DIM, unsigned FINAL_
     std::cout << "time of pruning: " << duration.count() << "s" << std::endl;
 }
 
+// Implement the Python API for constructing a large-scale graph index
 void largeIndex(vector<unsigned>& devicelist, unsigned DIM, unsigned K, unsigned cluster_num, unsigned max_points, string file_prefix, string local_index_path_prefix, string index_store_path, unsigned max_degree, unsigned buffer_size, unsigned all_node_num, char* centers_path, float thre, unsigned FINAL_DEGREE, unsigned TOPM){
     unsigned dim = DIM;
     vector<vector<unsigned>> graph_pool(buffer_size);
@@ -357,14 +366,21 @@ void largeIndex(vector<unsigned>& devicelist, unsigned DIM, unsigned K, unsigned
         has_merged[i] = false;
     }
 
+    // Dispatch the order of clusters
     order_merge_main(Centers, Centers_second, cluster_num, all_node_num, results, clusters, position, buffer_size);
 
     vector<unsigned> metroids(cluster_num);
     bool lock_global = false;
+
+    // Asynchronously construct subgraphs and merge subgraphs  
+
     auto start = std::chrono::high_resolution_clock::now();
     
+    // Use a CPU thread to merge subgraphs    
     thread t1(order_merge_new, ref(clusters), all_node_num, cluster_num, ref(Centers), ref(Centers_second), ref(results), ref(position), ref(metroids), index_store_path, local_index_path_prefix, K, ref(graph_pool), ref(has_merged), ref(has_built), max_degree, buffer_size);
     vector<thread> construct_threads;
+    
+    // Allocate a thread to each GPU and construct subgraphs concurrently on the GPU(s) 
     for(unsigned i = 0; i < devicelist.size(); i++){
         construct_threads.push_back(thread(gpu_construct, ref(clusters), cluster_num, ref(results), ref(position), ref(metroids), ref(devicelist), i, file_prefix, DIM, max_points, K, ref(graph_pool), ref(has_merged), ref(has_built), thre, FINAL_DEGREE, TOPM, dis_func));
     }
