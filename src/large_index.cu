@@ -2,7 +2,10 @@
 
 using namespace std;
 
-
+/*
+Algorithm 4 in the paper: cluster-aware dispatching strategy
+This function reorders the clusters based on their overlapped nodes
+*/
 void reorder(vector<map<unsigned, unsigned>>& intersect, unsigned cluster_num, unsigned buffer_size, unsigned ini, vector<unsigned>& result, vector<unsigned>& position){
     vector<unsigned> buffer;
     vector<bool> visited(cluster_num);
@@ -79,6 +82,7 @@ void reorder(vector<map<unsigned, unsigned>>& intersect, unsigned cluster_num, u
     // cout << endl;
 }
 
+// prepare the data for reordering
 void order_merge_main(vector<unsigned>& Centers, vector<unsigned>& Centers_second, unsigned cluster_num, unsigned points_num, vector<unsigned>& result, vector<vector<unsigned>>& clusters, vector<unsigned>& position, unsigned buffer_size){
     vector<map<unsigned, unsigned>> intersect(cluster_num);
     for(unsigned i = 0; i < points_num; i++){
@@ -101,6 +105,7 @@ void order_merge_main(vector<unsigned>& Centers, vector<unsigned>& Centers_secon
     reorder(intersect, cluster_num, buffer_size, 0, result, position);
 }
 
+// convert float type to half type for central point
 __global__ void f2h_center(float* data, half* data_half, unsigned DIM){
     unsigned tid = blockIdx.x * blockDim.x + threadIdx.x;
     for(unsigned i = tid; i < DIM; i += blockDim.x * gridDim.x){
@@ -108,6 +113,7 @@ __global__ void f2h_center(float* data, half* data_half, unsigned DIM){
     }
 }
 
+// convert float type to half type
 __global__ void f2h(float* data, half* data_half, unsigned POINTS, unsigned DIM){
     unsigned tid = blockIdx.x * blockDim.x + threadIdx.x;
     for(unsigned i = tid; i < POINTS * DIM; i += blockDim.x * gridDim.x){
@@ -115,6 +121,12 @@ __global__ void f2h(float* data, half* data_half, unsigned POINTS, unsigned DIM)
     }
 }
 
+/*
+Subgraph construction function using GPUs
+This function performs GNN-Descent and CFS pruning sequentially. 
+Before that, it prepares the required data during the construction. 
+Finally, it stores the subgraphs into the buffer on the CPU. 
+*/
 void gpu_construct(vector<vector<unsigned>>& clusters, unsigned cluster_num, vector<unsigned>& order, vector<unsigned>& graph_position, vector<unsigned>& metroids, vector<unsigned>& devicelist, unsigned deviceID, string file_prefix, unsigned DIM, unsigned max_points, unsigned K, vector<vector<unsigned>>& graph_pool, vector<bool>& has_merged, vector<bool>& has_built, float thre, unsigned FINAL_DEGREE, unsigned TOPM, funcFormat dis_filter_new){
     unsigned dim = DIM, points_num;
     unsigned* graph_dev;
@@ -264,6 +276,11 @@ void gpu_construct(vector<vector<unsigned>>& clusters, unsigned cluster_num, vec
     }
 }
 
+/* 
+Algorithm 3 in the paper: merge the subgraphs.
+It asynchronously merges the subgraphs using the CPU. 
+Finally, it stores the global graph index into the disk. 
+*/
 void order_merge_new(vector<vector<unsigned>>& clusters, unsigned points_num, unsigned cluster_num, vector<unsigned>& Centers, vector<unsigned>& Centers_second, vector<unsigned>& order, vector<unsigned>& graph_position, vector<unsigned>& metroids, string index_store_path, string local_index_path_prefix, unsigned K, vector<vector<unsigned>>& graph_pool, vector<bool>& has_merged, vector<bool>& has_built, unsigned max_degree, unsigned buffer_size){
 
     uint64_t index_size = 0;
