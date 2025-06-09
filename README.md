@@ -122,7 +122,7 @@ Extension to Other Refinement-based Indexes
 -------------------------------------------------------------------------------
 Currently, Tagore has 5 built-in indexing methods: [NSG](https://www.vldb.org/pvldb/vol12/p461-fu.pdf), [Vamana](https://papers.nips.cc/paper_files/paper/2019/hash/09853c7fb1d3f8ee67a61b6bf4a7f8e6-Abstract.html), [CAGRA](https://arxiv.org/abs/2308.15136), [NSSG](https://arxiv.org/abs/1907.06146), and [DPG](https://ieeexplore.ieee.org/document/8681160). These 5 pruning strategies represent foundational pruning methods that influence many others. Therefore, the current implementation of the CFS framework supports the extension to a wide range of strategies with minimal changes.  
 
-For existing methods that can reuse the built-in parameter options, we use two examples to illustrate how to implement a pruning strategy by adding a few lines of code. Both examples collect kNN candidates using the Collect operation (the last k candidates with `path' parameter in Algorithm 2) and apply the incremental computing model (Figure 6) for filtering. 
+For existing methods that can reuse the built-in parameter options, we use two examples to illustrate how to implement a pruning strategy by adding a few lines of code. Both examples collect kNN candidates using the Collect operation (the last k candidates with 'path' parameter in Algorithm 2) and apply the incremental computing model (Figure 6) for filtering. 
 
 (1) $\alpha$-pruning strategy [[VLDB'25](https://arxiv.org/abs/2410.01231)] 
 
