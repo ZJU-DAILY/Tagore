@@ -186,6 +186,7 @@ __global__ void sample_kernel6(unsigned* graph, unsigned* reverse_graph, unsigne
     __shared__ half4 tmp_val_sha[DIM_SIZE / 4];
     if(tid == 0) lock = 1;
     __syncthreads();
+    // sample new candidates
     if(threadIdx.y % 4 == 0 && laneid == 0){
         while (atomicExch(&lock, 0) == 0);
         while(nei_visit[bid*K+tmp_it] == true && tmp_it < K){
@@ -214,7 +215,7 @@ __global__ void sample_kernel6(unsigned* graph, unsigned* reverse_graph, unsigne
         new_list2[i] = graph[bid * K + i];
     }
     __syncthreads();
-
+    // remove duplicate candidates
     bitonic_sort_id_new2(new_list_shared, MAX_P);
     bitonic_sort_id_new2(new_list2, K);
 
@@ -249,6 +250,7 @@ __global__ void sample_kernel6(unsigned* graph, unsigned* reverse_graph, unsigne
     }
     __syncthreads();
 
+    // calculate distances
     // half4 val1;
     // if(laneid < 24) val1 = Load(&values[bid * DIM + 4 * laneid]);
     for(unsigned i = tid; i < (DIM / 4); i += blockDim.x * blockDim.y){
@@ -707,6 +709,8 @@ __global__ void nn_descent_opt_cal(unsigned* graph, unsigned* reverse_graph, hal
     //     printf("A\n");
     // }
     __syncthreads();
+    
+    // calculate distance using Tensor cores
     wmma::fragment<wmma::matrix_a, BLK_H, BLK_H, BLK_W, half, wmma::row_major> a_frag;
     wmma::fragment<wmma::matrix_b, BLK_H, BLK_H, BLK_W, half, wmma::col_major> b_frag;
     wmma::fragment<wmma::accumulator, BLK_H, BLK_H, BLK_W, float> acc_frag;
@@ -758,6 +762,7 @@ __global__ void nn_descent_opt_cal(unsigned* graph, unsigned* reverse_graph, hal
     unsigned min_ele_id1, min_ele_id2;
     float min_ele_val1, min_ele_val2;
 
+    // find the local nearest candidates
     min_ele_id1 = (acc_frag.x[0] < acc_frag.x[1] ? old_nn[warp_id_y * BLK_W + (laneid%4) * 2] : old_nn[warp_id_y * BLK_W + (laneid%4) * 2 + 1]);
     min_ele_val1 = min(acc_frag.x[0], acc_frag.x[1]);
     min_ele_id1 = (min_ele_val1 < acc_frag.x[4] ? min_ele_id1 : old_nn[warp_id_y * BLK_W + (laneid%4) * 2 + 8]);
@@ -1406,6 +1411,8 @@ __device__ void Filter_path(unsigned* shared_cand, float* shared_dis, unsigned* 
     }
     
     __syncthreads();
+
+    // search the nodes
     while(cur_nei < FINAL_DEGREE){
         for(unsigned i = tid; i < (DIM / 4); i += blockDim.x * blockDim.y){
             tmp_val_sha[i] = Load(&values[final_nei[cur_nei - 1] * DIM + 4 * i]);
