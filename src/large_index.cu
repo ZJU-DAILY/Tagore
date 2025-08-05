@@ -192,6 +192,7 @@ void gpu_construct(vector<vector<unsigned>>& clusters, unsigned cluster_num, vec
         cout << "Device:" << devicelist[deviceID] << "; Points num:" << points_num << " has been move to GPU" << endl;
         cudaMemset(data_power_dev, 0, points_num * sizeof(float));
 
+        // calculate the center value of the partition
         float *center = new float [DIM];
         for (unsigned j = 0; j < DIM; j++) center[j] = 0;
         for (unsigned i = 0; i < points_num; i++) {
@@ -245,6 +246,7 @@ void gpu_construct(vector<vector<unsigned>>& clusters, unsigned cluster_num, vec
         merge_reverse_plus<<<grid, block3>>>(graph_dev, reverse_graph_dev, nei_distance, reverse_distance, reverse_num, K);
         reset_reverse_num<<<1000, 1024>>>(reverse_num, max_points);
 
+        // search for the entry point using the GPU 
         cal_ep_gpu<<<grid_one, block_s>>>(graph_dev, reverse_graph_dev, ep_dev, center_dev_half, data_half_dev, SELECT_CAND, DIM, TOPM, K);
 
         select_path<<<grid_s, block_s>>>(graph_dev, reverse_graph_dev, ep_dev, data_half_dev, SELECT_CAND, nei_distance, reverse_distance, reverse_num, DIM, FINAL_DEGREE, TOPM, K, thre);
