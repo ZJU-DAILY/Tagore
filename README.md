@@ -68,7 +68,7 @@ import Tagore
 k = 96
 vector_num = 1000000
 dim = 128
-final_degree = 64
+final_degree = 32
 m = 64
 
 # Initialization: constructing a kNN graph
@@ -85,7 +85,7 @@ import Tagore
 k = 96
 vector_num = 1000000
 dim = 128
-final_degree = 64
+final_degree = 32
 m = 64
 
 # Initialization: constructing a kNN graph
