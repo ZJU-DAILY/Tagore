@@ -42,7 +42,7 @@
 // TOPM
 #define TOPM_SIZE 64
 // FINAL_DEGREE 32
-#define FINAL_DEGREE_SIZE 32
+#define FINAL_DEGREE_SIZE 64
 
 using namespace nvcuda;
 
