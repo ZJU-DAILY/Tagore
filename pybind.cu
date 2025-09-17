@@ -374,7 +374,6 @@ void largeIndex(vector<unsigned>& devicelist, unsigned DIM, unsigned K, unsigned
 
     // Asynchronously construct subgraphs and merge subgraphs  
 
-    auto start = std::chrono::high_resolution_clock::now();
     
     // Use a CPU thread to merge subgraphs    
     thread t1(order_merge_new, ref(clusters), all_node_num, cluster_num, ref(Centers), ref(Centers_second), ref(results), ref(position), ref(metroids), index_store_path, local_index_path_prefix, K, ref(graph_pool), ref(has_merged), ref(has_built), max_degree, buffer_size);
@@ -390,9 +389,6 @@ void largeIndex(vector<unsigned>& devicelist, unsigned DIM, unsigned K, unsigned
         construct_threads[i].join();
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<float> duration = end - start;
-    std::cout << "time for indexing: " << duration.count() << "s" << std::endl;
 }
 PYBIND11_MODULE(Tagore, m) {
     m.doc() = "Tagore GPU Indexing";
