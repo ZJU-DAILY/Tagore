@@ -37,7 +37,7 @@
 // TOPM
 #define TOPM_SIZE 64
 // FINAL_DEGREE 32
-#define FINAL_DEGREE_SIZE 32
+#define FINAL_DEGREE_SIZE 64
 
 #define BUFFER_SIZE_FOR_CACHED_IO (size_t)1024 * (size_t)1048576
 #define BUFFER_SIZE_FOR_CACHED_READ (size_t)1024 * (size_t)102400
